@@ -1,4 +1,4 @@
-all: icons templates
+all: dependencies templates icons
 
 clean:
 	rm -rf build
@@ -10,6 +10,9 @@ structure: clean
 dockerfiles: structure
 	docker build -t timiter/imagemagick Dockerfiles/imagemagick
 	docker build -t timiter/pug Dockerfiles/pug
+
+dependencies: structure
+	git clone https://github.com/yolk/mite.js build/mite
 
 templates: dockerfiles
 	docker run --rm -it -v ${shell pwd}/build/:/templates timiter/pug sh -c 'pug /templates'
