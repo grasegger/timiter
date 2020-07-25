@@ -4,7 +4,8 @@
     "version": "0.0.0",
     "description": "Allows you to control mite from your toolbar and various sites.",
     "icons": {
-        "48": "icons/timiter-48.png"
+        "48": "icons/timiter-48.png",
+        "96": "icons/timiter-96.png"
     },
     "content_scripts": [],
     "browser_action": {
