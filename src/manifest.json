@@ -7,7 +7,17 @@
         "48": "icons/timiter-48.png",
         "96": "icons/timiter-96.png"
     },
-    "content_scripts": [],
+    "content_scripts": [
+        {
+            "matches": [
+                "*://*.github.com/*",
+                "*://*.mozilla.org/*"
+            ],
+            "js": [
+                "githubtracker.js"
+            ]
+        }
+    ],
     "browser_action": {
         "default_icon": "icons/timiter-32.png",
         "theme_icons": [
