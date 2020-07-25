@@ -13,6 +13,7 @@ dockerfiles: structure
 
 dependencies: structure
 	git clone https://github.com/yolk/mite.js build/mite
+	curl https://moment.github.io/luxon/global/luxon.min.js > build/luxon.js
 
 templates: dockerfiles
 	docker run --rm -it -v ${shell pwd}/build/:/templates timiter/pug sh -c 'pug /templates'
