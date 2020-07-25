@@ -10,7 +10,7 @@
     "content_scripts": [
         {
             "matches": [
-                "*://*.github.com/*"
+                "*://*.github.com/*/issues/*"
             ],
             "js": [
                 "githubtracker.js"
