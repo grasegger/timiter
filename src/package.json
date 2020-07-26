@@ -1,0 +1,6 @@
+{
+  "name": "timiter",
+  "devDependencies": {
+    "webextension-polyfill": "^0.6.0"
+  }
+}
