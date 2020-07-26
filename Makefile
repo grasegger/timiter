@@ -7,9 +7,13 @@ bumpversion:
 version: structure bumpversion
 	sed -i '' "s|SEMVER_VERSION_HERE|${shell cat .version}|g" build/manifest.json
 
-clean:
-	rm -rf build
-	rm -rf packages
+cleanRepo:
+	git clean -fxd
+
+cleanDocker:
+	docker image rm -f ${shell docker image ls | grep timiter | sed 's| .*||'} || true
+
+clean: cleanRepo cleanDocker
 
 npmdeps: clean
 	docker run --rm -it -v ${shell pwd}/src:/src node:alpine sh -c 'cd /src && npm install'
@@ -27,13 +31,10 @@ dockerPug:
 dockerWebExt:
 	docker build -t timiter/web-ext Dockerfiles/webext
 
-dockerChrome:
-	docker build -t timiter/chromium Dockerfiles/chromium
-
-dockerfiles: dockerImagemagick dockerPug dockerWebExt dockerChrome
+dockerfiles: dockerImagemagick dockerPug dockerWebExt
 
 dependencies: structure
-	git clone https://github.com/yolk/mite.js build/mite
+	git clone https://github.com/yolk/mite.js build/mite || true
 	curl https://moment.github.io/luxon/global/luxon.min.js > build/luxon.js
 
 templates: dockerfiles
@@ -60,3 +61,4 @@ packages: firefox safari
 	mkdir -p packages
 	mv safari-build/Timiter/build/Release/Timiter.app packages/
 	mv build/web-ext-artifacts/timiter-${shell cat .version}.zip packages/timiter.zip
+# if you run this with multible jobs, reset the terminal
