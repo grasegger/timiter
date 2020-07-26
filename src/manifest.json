@@ -13,7 +13,11 @@
                 "*://*.github.com/*/issues/*"
             ],
             "js": [
+                "mite/mite.js",
                 "githubtracker.js"
+            ],
+            "css": [
+                "githubtracker.css"
             ]
         }
     ],
@@ -33,7 +37,9 @@
         "page": "options.html"
     },
     "permissions": [
-        "storage"
+        "storage",
+        "*://*.mite.yo.lk/*",
+        "webRequest"
     ],
     "browser_specific_settings": {
         "gecko": {
@@ -44,5 +50,8 @@
         "gecko": {
             "id": "timiter@gebruederheitz.de"
         }
-    }
+    },
+    "web_accessible_resources": [
+        "mite/mite.js"
+    ]
 }

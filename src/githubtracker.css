@@ -1,0 +1,21 @@
+.timiter-heading::marker {
+    content: '';
+}
+
+.timiter-select-wrapper {
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    grid-template-rows: 1fr;
+    align-items: center;
+    justify-items: center;
+    justify-content: center;
+    margin-bottom: .5rem;
+}
+
+.timiter-select-wrapper > div > svg {
+    margin: 0 6px;
+}
+
+#timiter-current-timer {
+    margin-top: 12px;
+}
