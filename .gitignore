@@ -1,1 +1,4 @@
 /build/
+/src/node_modules/
+/safari-build/
+/.DS_Store

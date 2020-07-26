@@ -13,6 +13,7 @@
                 "*://*.github.com/*/issues/*"
             ],
             "js": [
+                "node_modules/webextension-polyfill/dist/browser-polyfill.min.js",
                 "mite/mite.js",
                 "githubtracker.js"
             ],
@@ -50,8 +51,5 @@
         "gecko": {
             "id": "timiter@gebruederheitz.de"
         }
-    },
-    "web_accessible_resources": [
-        "mite/mite.js"
-    ]
+    }
 }
