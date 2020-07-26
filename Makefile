@@ -1,4 +1,4 @@
-MAKEFLAGS += --jobs=8
+.PHONY: all dockerfiles
 all: dependencies templates icons version
 
 bumpversion:
@@ -9,6 +9,7 @@ version: structure bumpversion
 
 clean:
 	rm -rf build
+	rm -rf packages
 
 npmdeps: clean
 	docker run --rm -it -v ${shell pwd}/src:/src node:alpine sh -c 'cd /src && npm install'
@@ -17,9 +18,19 @@ structure: npmdeps
 	mkdir -p build
 	rsync -ra src/ build/
 
-dockerfiles: structure
+dockerImagemagick:
 	docker build -t timiter/imagemagick Dockerfiles/imagemagick
+
+dockerPug:
 	docker build -t timiter/pug Dockerfiles/pug
+
+dockerWebExt:
+	docker build -t timiter/web-ext Dockerfiles/webext
+
+dockerChrome:
+	docker build -t timiter/chromium Dockerfiles/chromium
+
+dockerfiles: dockerImagemagick dockerPug dockerWebExt dockerChrome
 
 dependencies: structure
 	git clone https://github.com/yolk/mite.js build/mite
@@ -37,3 +48,15 @@ icons: dockerfiles
 safari: all
 	yes | xcrun safari-web-extension-converter build --project-location ./safari-build --app-name Timiter --bundle-identifier de.gebruederheitz.timiter --copy-resources --force --no-open --objc
 	cd safari-build/Timiter && xcodebuild build
+
+firefox: all
+	docker run --rm -it -v ${shell pwd}/build/:/build timiter/web-ext sh -c "cd /build && web-ext build"
+
+# this doesnt work ... copy the command to a shell and it works ... crazy
+# chrome: all
+#	/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --pack-extension=./build
+
+packages: firefox safari
+	mkdir -p packages
+	mv safari-build/Timiter/build/Release/Timiter.app packages/
+	mv build/web-ext-artifacts/timiter-${shell cat .version}.zip packages/timiter.zip
