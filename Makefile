@@ -1,4 +1,11 @@
-all: dependencies templates icons
+MAKEFLAGS += --jobs=8
+all: dependencies templates icons version
+
+bumpversion:
+	sh .semver.sh -p ${shell cat .version}
+
+version: structure bumpversion
+	sed -i '' "s|SEMVER_VERSION_HERE|${shell cat .version}|g" build/manifest.json
 
 clean:
 	rm -rf build
