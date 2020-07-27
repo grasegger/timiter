@@ -2,6 +2,10 @@
     content: '';
 }
 
+.timiter-select {
+    width: 100%;
+}
+
 .timiter-select-wrapper {
     display: grid;
     grid-template-columns: 32px 1fr;

@@ -15,7 +15,7 @@ cleanDocker:
 
 clean: cleanRepo cleanDocker
 
-npmdeps: clean
+npmdeps:
 	docker run --rm -it -v ${shell pwd}/src:/src node:alpine sh -c 'cd /src && npm install'
 
 structure: npmdeps

@@ -1,31 +1,86 @@
 let mite = {};
 
-function addTimiterToIssueSidebar () {
-    let oldWrapper = document.querySelector('#timiter-wrapper');
+let settings = {};
+
+let cache = {
+    tracker: false,
+    clientsLoaded: false,
+    projectsLoaded: false,
+    servicesLoaded: false,
+    sidebarPlaced: false,
+    miteLoaded: false,
+    miteRunning: false,
+    miteNote: "",
+    buttonClick: 0,
+    miteRefresh: 0
+};
+
+function removeElement(selector) {
+    let oldWrapper = document.querySelector(selector);
 
     if (oldWrapper !== null) {
         oldWrapper.remove();
     }
+}
+
+function runAsync(callback, timeout = 0) {
+    window.setTimeout(() => {
+        try {
+            callback();
+        } catch(error) {
+            console.log(error);
+        }
+    }, timeout);
+}
+
+function clearSelect(selector) {
+    document.querySelectorAll(`${selector} option`).forEach(option => option.remove());
+}
+
+function enable(selector) {
+    document.querySelector(selector).disabled = false;
+}
+
+function disable(selector) {
+    document.querySelector(selector).disabled = true;
+}
+
+function appendToSelect(selector, optionValue, optionName) {
+    let option = document.createElement('option');
+    option.setAttribute('value', optionValue);
+    option.innerHTML = optionName;
+
+    document.querySelector(selector).appendChild(option);
+}
+
+function xhrError(_, msg) {
+    console.log(msg);
+}
+
+function elementPresent(selector) {
+    let elem = document.querySelector(selector);
+    return ! elem !== null;
+}
+
+function addTimiterToIssueSidebar () {
+    removeElement('#timiter-wrapper');
 
     let githubSidebar = document.querySelector('#partial-discussion-sidebar');
     githubSidebar.prepend(getTimiterSidebarContent());
 
-    window.setTimeout(() => {
-        enableTrackingButton();
-    });
+    cache.sidebarPlaced = true;
+    document.querySelector('#timiter-clients').addEventListener('change', populateProjectList);
+    document.querySelector('#timiter-tracking-button').addEventListener('click', timerButtonPressed);
+}
 
-    let settings = getBrowserSettings();
-    settings.then((result) => {
-        addMiteToWindow(result.miteInstance, result.miteApiKey);
-        window.setTimeout(() => {
-            populateClientList();
-            window.setTimeout(() => {
-                populateProjectList();
-            }, 500);
+function initTimiter() {
+    browser.storage.sync.get().then((result) => {
+        settings = result;
+        mite = new Mite({
+            account: settings.miteInstance,
+            api_key: settings.miteApiKey
         });
-        window.setTimeout(() => {
-            populateServiceList();
-        });
+        cache.miteLoaded = true;
     });
 }
 
@@ -105,9 +160,8 @@ function getTimiterSelect (selectID, icon) {
     select.id = selectID;
     select.disabled = true;
     select.classList.add('timiter-select');
-    select.classList.add('btn');
-    select.classList.add('btn-block');
-    select.classList.add('btn-sm');
+    select.classList.add('form-select');
+    select.classList.add('select-sm');
 
     let dummyOption = document.createElement('option');
     dummyOption.innerHTML = 'Loading content ...';
@@ -137,268 +191,325 @@ function getTimiterButton () {
     return trackingButton;
 }
 
-function getBrowserSettings() {
-    return browser.storage.sync.get();
-}
-
-function addMiteToWindow(instance, apikey) {
-    try {
-        mite = new Mite({account: instance, api_key: apikey});
-    } catch (error) {
-        console.log(error);
-    }
-
-    updateMiteLink(instance);
-}
-
-function updateMiteLink(instance) {
-    document.querySelector("#timiter-mite-link").href = `https://${instance}.mite.yo.lk`;
-    document.querySelector("#timiter-mite-link").innerHTML = 'Open Mite.';
-}
-
 function populateClientList () {
+    const selectID = '#timiter-clients';
+
     function addDataToList(clients){
-        clearCustomerSelect();
         clients.forEach((client) => {
-            addCustomerToSelect(client.customer.id, client.customer.name);
+            appendToSelect(selectID, client.customer.id, client.customer.name);
         });
-        enableCustomerSelect();
-        document.querySelector('#timiter-clients').addEventListener('change', () => {
-            populateProjectList();
+        enable(selectID);
+
+        try {
+            let client = settings[getRepo()].client;
+            document.querySelector('#timiter-clients').value = client;
+        } catch(error) {
+            if (typeof(error) != TypeError) {
+                console.log(error);
+            }
+        }
+        cache.clientsLoaded = true;
+    }
+
+    if ( ! cache.miteLoaded || ! elementPresent(selectID) ) {
+        runAsync(populateClientList, 500);
+    } else {
+        clearSelect(selectID);
+        disable(selectID);
+        cache.clientsLoaded = false;
+        mite.Customer.active( {
+            success  : addDataToList,
+            error    : xhrError,
         });
     }
-
-    function clearCustomerSelect() {
-        document.querySelector('#timiter-clients').childNodes.forEach((child) => child.remove());
-    }
-
-    function enableCustomerSelect() {
-        document.querySelector('#timiter-clients').disabled = false;
-    }
-
-    function addCustomerToSelect(id, name) {
-        let option = document.createElement('option');
-        option.setAttribute('value', id);
-        option.innerHTML = name;
-
-        document.querySelector('#timiter-clients').appendChild(option);
-    }
-
-    mite.Customer.active( {
-        success  : function(data) {addDataToList(data)},
-        error    : function(xhr, msg) {console.log(msg)}
-    });
 }
 
 function populateProjectList () {
-    function addDataToList(projects){
-        clearProjectSelect();
-        let myProjects = projects.filter(project => project.project.customer_id == getCurrentCustomer());
-        myProjects.forEach((project) => {
-            addProjectToSelect(project.project.id, project.project.name);
-        });
-        enableProjectSelect();
-    }
-
-    function clearProjectSelect() {
-        document.querySelector('#timiter-projects').childNodes.forEach((child) => child.remove());
-    }
-
-    function enableProjectSelect() {
-        document.querySelector('#timiter-projects').disabled = false;
-    }
-
-    function disableProjectSelect() {
-        document.querySelector('#timiter-projects').disabled = true;
-    }
-
-    function addProjectToSelect(id, name) {
-        let option = document.createElement('option');
-        option.setAttribute('value', id);
-        option.innerHTML = name;
-
-        document.querySelector('#timiter-projects').appendChild(option);
-    }
+    const selectID = '#timiter-projects';
 
     function getCurrentCustomer() {
         return parseInt(document.querySelector('#timiter-clients').value);
     }
 
-    disableProjectSelect();
+    function addDataToList(data) {
+        let projects = data.filter(project => project.project.customer_id == getCurrentCustomer());
+        projects.forEach((project) => {
+            appendToSelect(selectID, project.project.id, project.project.name);
+        });
+        enable(selectID);
 
-    mite.Project.active({
-        success  : function(data) {addDataToList(data)},
-        error    : function(xhr, msg) {console.log(msg)}
-    });
+        try {
+            let project = settings[getRepo()].project;
+            document.querySelector('#timiter-projects').value = project;
+        } catch(error) {
+            if (typeof(error) != TypeError) {
+                console.log(error);
+            }
+        }
+
+        cache.projectsLoaded = true;
+    }
+
+    function loadProjects () {
+        mite.Project.active( {
+            success  : addDataToList,
+            error    : xhrError,
+        });
+    }
+
+    if ( ! cache.miteLoaded ||
+         ! cache.clientsLoaded ||
+         ! elementPresent(selectID) ) {
+        runAsync(populateProjectList, 500);
+    } else {
+        disable(selectID);
+        clearSelect(selectID);
+        cache.projectsLoaded = false;
+        runAsync(loadProjects, 500);
+    }
 }
 
 function populateServiceList () {
-    function addDataToList(services){
-        clearServiceSelect();
-        services.forEach((service) => {
-            addServiceToSelect(service.service.id, service.service.name);
+    const selectID = '#timiter-services';
+
+    function addDataToList(data){
+        clearSelect(selectID);
+        data.forEach((service) => {
+            appendToSelect(selectID, service.service.id, service.service.name);
         });
-        enableServiceSelect();
+        enable(selectID);
+        cache.servicesLoaded = true;
+
+        if (typeof(settings.lastService) != 'undefined') {
+            document.querySelector('#timiter-services').value = settings.lastService;
+        }
     }
 
-    function clearServiceSelect() {
-        document.querySelector('#timiter-services').childNodes.forEach((child) => child.remove());
+    if ( ! cache.miteLoaded || ! elementPresent(selectID) ) {
+        runAsync(populateServiceList, 500);
+    } else {
+        disable(selectID);
+        cache.servicesLoaded = false;
+        mite.Service.active( {
+            success  : addDataToList,
+            error    : xhrError,
+        });
     }
-
-    function enableServiceSelect() {
-        document.querySelector('#timiter-services').disabled = false;
-    }
-
-    function addServiceToSelect(id, name) {
-        let option = document.createElement('option');
-        option.setAttribute('value', id);
-        option.innerHTML = name;
-
-        document.querySelector('#timiter-services').appendChild(option);
-    }
-
-    mite.Service.active({
-        success  : function(data) {addDataToList(data)},
-        error    : function(xhr, msg) {console.log(msg)}
-    });
 }
 
-function startTracking (event) {
-    event.preventDefault();
+function startTracking () {
+    function startTracker(data) {
+        let id = data.time_entry.id;
+
+        let callbacks = {error: xhrError};
+
+        mite.Tracker.start(id,callbacks);
+    }
 
     let project = document.querySelector('#timiter-projects').value;
     let service = document.querySelector('#timiter-services').value;
 
-    let title = document.querySelector('.js-issue-title').innerHTML.trim();
-    let number = document.querySelector('.gh-header-number').innerHTML;
-
     let args = {
-        note: `${number} - ${title}`,
+        note: getCurrentIssueName(),
         project_id: project,
         service_id: service
     };
 
     let callbacks = {
-        success  : function(data) {
-            let id = data.time_entry.id;
-
-            let callbacks = {
-                error    : function(xhr, msg) {console.log(msg);}
-            };
-
-            mite.Tracker.start(id,callbacks);
-            document.querySelector('#timiter-tracking-button').disabled = true;
-
-        },
-        error    : function(xhr, msg) {console.log(msg);}
+        success: startTracker,
+        error: xhrError
     };
 
     mite.TimeEntry.create(args, callbacks);
 }
 
-function reallyEnableTrackinButton() {
-    document.querySelector('#timiter-tracking-button').addEventListener('click', startTracking);
-    document.querySelector('#timiter-tracking-button').disabled = false;
-    document.querySelector('#timiter-button-text').innerHTML = 'Start Timer';
+function getCurrentIssueName() {
+    let title = document.querySelector('.js-issue-title').innerHTML.trim();
+    let number = document.querySelector('.gh-header-number').innerHTML;
+    return `${number} - ${title}`;
 }
 
-function enableTrackingButton() {
-    document.querySelector('#timiter-tracking-button').disabled = true;
-    document.querySelector('#timiter-tracking-button').removeEventListener('click', startTracking);
+function isMiteRunning() {
+    return cache.miteRunning;
+}
 
-    let client = document.querySelector('#timiter-clients').value;
-    let project = document.querySelector('#timiter-projects').value;
-    let service = document.querySelector('#timiter-services').value;
+function isTimerForThisIssue() {
+    return isMiteRunning() && getCurrentIssueName() == cache.miteNote;
+}
 
-    let dummyText = "Loading content ...";
+function stopTracking () {
+    function stopTracker (data)  {
+        if (typeof(data.tracker.tracking_time_entry) !== 'undefined') {
+            let id = data.tracker.tracking_time_entry.id;
+            let callbacks = {error: xhrError};
 
-    if (client != dummyText && project != dummyText && service != dummyText) {
-        reallyEnableTrackinButton();
-    } else {
-        window.setTimeout(() => {
-            enableTrackingButton();
-        }, 200);
+            mite.Tracker.stop(id,callbacks);
+        }
     }
-}
-
-function updateCurrentTimer() {
-    let callbacks = {
-        success: (data) => {
-            if (typeof(data.tracker.tracking_time_entry) !== 'undefined') {
-                let id = data.tracker.tracking_time_entry.id;
-                let callbacks = {
-                    success: (data) => {
-                        let note = data.time_entry.note;
-                        let text = `You are currently tracking <span class="text-green">${note}</span>.`;
-
-                        document.querySelector('#timiter-current-timer').innerHTML = text;
-                        makeTheTrackingButtonStop(note);
-                    },
-                    error: function(xhr, msg) {console.log(msg);}
-                };
-                mite.TimeEntry.find(id, callbacks);
-            } else {
-                document.querySelector('#timiter-current-timer').innerHTML = "No timer running.";
-            }
-            window.setTimeout(updateCurrentTimer, 5000);
-        },
-        error: function(xhr, msg) {console.log(msg);}
-    };
-
-    try {
-        mite.Tracker.find(callbacks);
-    } catch (_) {
-        window.setTimeout(updateCurrentTimer, 500);
-    }
-}
-
-function stopMiteTimer(event) {
-    event.preventDefault();
-    document.querySelector('#timiter-tracking-button').removeEventListener('click', stopMiteTimer);
 
     let callbacks = {
-        success: (data) => {
-            if (typeof(data.tracker.tracking_time_entry) !== 'undefined') {
-                let id = data.tracker.tracking_time_entry.id;
-                callbacks = {
-                    success: () => {
-                        console.log('stopping');
-                        document.querySelector('#timiter-button-text').innerHTML = "Start Timer";
-                        enableTrackingButton();
-                    },
-                    error: function(xhr, msg) {console.log(msg);}
-                };
-
-                mite.Tracker.stop(id,callbacks);
-            }
-        },
-        error: function(xhr, msg) {console.log(msg);}
+        success: stopTracker,
+        error: xhrError
     };
 
     mite.Tracker.find(callbacks);
 }
 
-function makeTheTrackingButtonStop(note) {
-    let title = document.querySelector('.js-issue-title').innerHTML.trim();
-    let number = document.querySelector('.gh-header-number').innerHTML;
+function timerButtonPressed() {
+    rememberRepoSelect();
+    rememberService();
+    disable('#timiter-tracking-button');
+    document.querySelectorAll('.timiter-select')
+        .forEach(select => select.disabled = true);
 
-    let currentIssue = `${number} - ${title}`;
+    cache.buttonClick = Date.now();
 
-    let buttonText = "Replace Timer";
+    if (isTimerForThisIssue()) {
+        stopTracking();
+    }
+    else {
+        startTracking();
+    }
+}
 
-    if (currentIssue == note) {
-        buttonText = "Stop Timer";
-        document.querySelector('#timiter-tracking-button').removeEventListener('click', startTracking);
-        document.querySelector('#timiter-tracking-button').addEventListener('click', stopMiteTimer);
+function renderTimerButton() {
+    if (cache.miteLoaded &&
+        cache.clientsLoaded &&
+        cache.projectsLoaded &&
+        cache.servicesLoaded &&
+        (cache.miteRefresh > cache.buttonClick))
+    {
+        enable('#timiter-tracking-button');
+
+        if (isTimerForThisIssue()) {
+            document.querySelector('#timiter-button-text')
+                .innerHTML = "Stop Timer";
+        }
+        else if (isMiteRunning()) {
+            document.querySelector('#timiter-button-text')
+                .innerHTML = "Replace Timer";
+        } else {
+            document.querySelector('#timiter-button-text')
+                .innerHTML = "Start Timer";
+        }
+    } else {
+        disable('#timiter-tracking-button');
+    }
+    runAsync(renderTimerButton, 200);
+}
+
+function renderInfo () {
+    if (cache.miteRunning) {
+        let note = document.createElement('span');
+        note.className = "text-orange";
+        note.innerHTML = cache.miteNote;
+        document.querySelector('#timiter-current-timer')
+            .innerHTML= `You are currently tracking: ${note.outerHTML}`;
+    } else {
+        document.querySelector('#timiter-current-timer')
+            .innerHTML= "No timer running.";
     }
 
-    document.querySelector('#timiter-button-text').innerHTML = buttonText;
-    document.querySelector('#timiter-tracking-button').disabled = false;
+    runAsync(renderInfo, 1000);
 }
 
-try {
-    addTimiterToIssueSidebar();
-    updateCurrentTimer();
-} catch (error) {
-    console.log(error);
+function renderMiteLink() {
+    if (! cache.miteLoaded ){
+        runAsync(renderMiteLink, 1000);
+    } else {
+        let link = document.querySelector('#timiter-mite-link');
+        link.href = `https://${settings.miteInstance}.mite.yo.lk`;
+        link.innerHTML = 'Open Mite';
+    }
 }
+
+function updateMiteInfo(oneshot = false) {
+    function setVariables(data) {
+        cache.miteRunning = true;
+        cache.miteNote = data.time_entry.note;
+        cache.miteRefresh = Date.now();
+    }
+
+    function setTimeEntry (data) {
+        if (typeof(data.tracker.tracking_time_entry) !== 'undefined') {
+            let callbacks = {
+                success: setVariables,
+                error: xhrError
+            };
+            mite.TimeEntry.find(data.tracker.tracking_time_entry.id, callbacks);
+        } else {
+            cache.miteRunning = false;
+            cache.miteRefresh = Date.now();
+        }
+    }
+
+    let callbacks = {
+        success: setTimeEntry,
+        error: xhrError
+    };
+
+    if (cache.miteLoaded) {
+        mite.Tracker.find(callbacks);
+        if (!oneshot) {
+            runAsync(updateMiteInfo, 2000);
+        }
+    } else {
+        if (!oneshot) {
+            runAsync(updateMiteInfo, 500);
+        }
+    }
+
+}
+
+function renderSelects() {
+    if (cache.miteRefresh > cache.buttonClick) {
+        document.querySelectorAll('.timiter-select')
+            .forEach(select => select.disabled = false);
+    } else {
+        document.querySelectorAll('.timiter-select')
+            .forEach(select => select.disabled = true);
+    }
+
+    runAsync(renderSelects, 500);
+}
+
+function getRepo() {
+    let pattern = /.*github.com\/(.*?)\/issues.*/gi;
+    return location.href.replace(pattern, '$1');
+}
+
+function rememberRepoSelect() {
+    let client = document.querySelector('#timiter-clients').value;
+    let project = document.querySelector('#timiter-projects').value;
+
+    let repoSettings = {};
+    repoSettings[getRepo()] = {
+        client: client,
+        project: project
+    };
+
+    browser.storage.sync.set(repoSettings);
+}
+
+function rememberService() {
+    let service = document.querySelector('#timiter-services').value;
+
+    browser.storage.sync.set({
+        lastService: service
+    });
+}
+
+function init () {
+    runAsync(addTimiterToIssueSidebar);
+    runAsync(initTimiter);
+    runAsync(populateClientList);
+    runAsync(populateProjectList);
+    runAsync(populateServiceList);
+    runAsync(renderTimerButton);
+    runAsync(renderInfo);
+    runAsync(renderMiteLink);
+    runAsync(updateMiteInfo);
+    runAsync(renderSelects);
+}
+
+runAsync(init);

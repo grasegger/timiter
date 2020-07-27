@@ -8,5 +8,9 @@ module.exports = {
         "ecmaVersion": 11
     },
     "rules": {
+    },
+    "globals": {
+        "Mite": true,
+        "browser": true
     }
 };
